@@ -1,0 +1,75 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+left to right direction
+
+title Ticketing System - Docker Deployment Diagram
+
+actor "Developer" as Developer
+
+package "Repository Artifacts" {
+  artifact "docker-compose.yml" as ComposeFile
+  artifact "Ticketing.Api/Dockerfile" as Dockerfile
+  artifact "Ticketing.Api.csproj" as Csproj
+  artifact "Ticketing.Api Source Code" as ApiSource
+}
+
+package "Docker Build Process" {
+  node "Docker Engine" as DockerEngine {
+	component "docker compose up\n(ticketing-api build)" as ComposeUp
+
+	package "Build Stage\n[mcr.microsoft.com/dotnet/sdk:10.0]" as BuildStage {
+	  component "dotnet restore\nTicketing.Api.csproj" as RestoreStep
+	  component "copy source files" as CopyStep
+	  component "dotnet publish -c Release\n-o /app/publish\n/p:UseAppHost=false" as PublishStep
+	}
+
+	package "Runtime Stage\n[mcr.microsoft.com/dotnet/aspnet:10.0]" as RuntimeStage {
+	  artifact "ticketing-api image" as ApiImage
+	  component "ASPNETCORE_URLS=http://+:8080" as RuntimeConfig
+	  component "EXPOSE 8080\nENTRYPOINT dotnet Ticketing.Api.dll" as RuntimeEntry
+	}
+  }
+}
+
+package "docker-compose Runtime Topology" {
+  frame "ticketing-network\n(bridge)" as TicketingNetwork {
+	node "ticketing-api service" as ApiService {
+	  component "Web API container\nport 8080 -> 8080" as WebApi
+	  component "Environment:\n- ASPNETCORE_ENVIRONMENT=Development\n- ConnectionStrings__DefaultConnection\n- Database__MigrateOnStartup=true\n- Database__SeedOnStartup=true" as ApiEnv
+	}
+
+	database "postgres service\npostgres:16-alpine\nport 5433 -> 5432" as Postgres {
+	  component "POSTGRES_DB=ticketing\nPOSTGRES_USER=ticketing_user\nPOSTGRES_PASSWORD=ticketing_password" as PgEnv
+	  component "healthcheck:\npg_isready -U ticketing_user -d ticketing" as PgHealth
+	}
+  }
+
+  collections "ticketing-postgres-data\nDocker volume" as PostgresVolume
+}
+
+Developer --> ComposeFile : runs docker compose
+ComposeFile --> ComposeUp : defines services, network, volume
+ComposeFile --> Dockerfile : build.context=.\nbuild.dockerfile=Ticketing.Api/Dockerfile
+
+Dockerfile --> RestoreStep : COPY csproj
+Csproj --> RestoreStep
+Dockerfile --> CopyStep : COPY Ticketing.Api/
+ApiSource --> CopyStep
+RestoreStep --> CopyStep
+CopyStep --> PublishStep
+PublishStep --> ApiImage : published output
+RuntimeConfig --> ApiImage
+RuntimeEntry --> ApiImage
+
+ApiImage --> WebApi : container image for service
+ApiEnv --> WebApi
+
+WebApi --> Postgres : Npgsql connection over ticketing-network
+ApiService ..> Postgres : depends_on\nservice_healthy
+PgEnv --> Postgres
+PgHealth --> Postgres
+PostgresVolume --> Postgres : /var/lib/postgresql/data
+
+@enduml
+

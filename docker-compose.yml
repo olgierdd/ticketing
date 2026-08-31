@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketing-postgres
+    environment:
+      POSTGRES_DB: ticketing
+      POSTGRES_USER: ticketing_user
+      POSTGRES_PASSWORD: ticketing_password
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - ticketing-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketing_user -d ticketing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - ticketing-network
+
+  ticketing-api:
+    build:
+      context: .
+      dockerfile: Ticketing.Api/Dockerfile
+    container_name: ticketing-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=ticketing;Username=ticketing_user;Password=ticketing_password
+      Database__MigrateOnStartup: "true"
+      Database__SeedOnStartup: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ticketing-network
+
+volumes:
+  ticketing-postgres-data:
+
+networks:
+  ticketing-network:
+    driver: bridge
+

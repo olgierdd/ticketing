@@ -1,0 +1,93 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+left to right direction
+
+title Ticketing.Api - Component Diagram
+
+actor "API Client" as Client
+
+package "Ticketing.Api" {
+  package "HTTP Pipeline" {
+    component "Program / DI Container" as Program
+    component "ExceptionHandlingMiddleware" as Middleware
+    component "FluentValidation\n(Request Validators)" as Validators
+  }
+
+  package "Controllers" {
+    component "EventsController" as EventsController
+    component "TicketsController" as TicketsController
+    component "ReportsController" as ReportsController
+  }
+
+  package "Application Services" {
+    interface "IEventService" as IEventService
+    interface "ITicketService" as ITicketService
+    interface "IReportService" as IReportService
+
+    component "EventService" as EventService
+    component "TicketService" as TicketService
+    component "ReportService" as ReportService
+  }
+
+  package "Mapping" {
+    component "ResponseMapper" as Mapper
+  }
+
+  package "Persistence" {
+    component "ApplicationDbContext\n(EF Core + Npgsql)" as DbContext
+  }
+
+  package "Domain" {
+    component "Event" as EventEntity
+    component "PricingTier" as PricingTierEntity
+    component "TicketPurchase" as TicketPurchaseEntity
+  }
+
+  package "Infrastructure" {
+    component "Custom Exceptions\n(NotFound/Conflict/BusinessRule)" as Exceptions
+  }
+}
+
+database "PostgreSQL" as PostgreSql
+
+Client --> EventsController : HTTP JSON
+Client --> TicketsController : HTTP JSON
+Client --> ReportsController : HTTP JSON
+
+Program --> Middleware : registers
+Program --> Validators : registers
+Program --> IEventService : AddScoped
+Program --> ITicketService : AddScoped
+Program --> IReportService : AddScoped
+Program --> DbContext : AddDbContext
+
+Middleware ..> Exceptions : maps to ProblemDetails
+Middleware ..> Validators : handles validation failures
+
+EventsController --> IEventService
+TicketsController --> ITicketService
+ReportsController --> IReportService
+
+IEventService <|.. EventService
+ITicketService <|.. TicketService
+IReportService <|.. ReportService
+
+EventService --> DbContext
+TicketService --> DbContext
+ReportService --> DbContext
+
+EventService ..> Mapper : entity -> DTO
+TicketService ..> Mapper : entity -> DTO
+
+DbContext --> EventEntity
+DbContext --> PricingTierEntity
+DbContext --> TicketPurchaseEntity
+DbContext --> PostgreSql
+
+EventEntity --> PricingTierEntity : 1..*
+EventEntity --> TicketPurchaseEntity : 1..*
+TicketPurchaseEntity --> PricingTierEntity : references
+
+@enduml
+

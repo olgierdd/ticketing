@@ -1,0 +1,106 @@
+@baseUrl = http://localhost:8080
+
+@jazzEventId = 73060548-fdc3-4b0b-b8f8-ff73fad81de2
+@nordicEventId = 8c746243-fd4f-424c-83f1-89453063ebc6
+@symphonicEventId = b7c0ec01-b6f2-4b63-b275-f376d51dc6da
+
+@jazzVIPPriceTierId = cc5e8989-e35e-462e-a3fc-207df82abbb1
+@jazzBookingId = BK-20260831-8813BD0646
+
+@nordicLightsPriceStandardId = 1b8fe018-1c30-4015-9dec-2c3c21a63341
+@nordicBookingRef = BK-20260831-40A2A67A93
+
+@symphonicPriceStandard = 6f6da4dd-67fc-4b5b-9e92-2029ae6679c3
+@symphonicBookingRef = BK-20260831-07CA3C6089
+
+### All Events
+GET {{baseUrl}}/api/v1/events?pageNumber=1&pageSize=20
+Accept: application/json
+
+### Jazz Under Stars - availability
+GET {{baseUrl}}/api/v1/tickets/availability/{{jazzEventId}}
+Accept: application/json
+
+### Jazz Under Stars - event details (copy a pricingTierId from the response)
+GET {{baseUrl}}/api/v1/events/{{jazzEventId}}
+Accept: application/json
+
+### Jazz Under Stars - purchase tickets
+POST {{baseUrl}}/api/v1/tickets/purchases
+Content-Type: application/json
+Accept: application/json
+
+{
+  "eventId": "{{jazzEventId}}",
+  "pricingTierId": "{{jazzVIPPriceTierId}}",
+  "customerName": "Alice",
+  "customerEmail": "alice@example.com",
+  "quantity": 2
+}
+
+### Jazz Under Stars - booking details by booking reference
+GET {{baseUrl}}/api/v1/tickets/purchases/reference/{{jazzBookingId }}
+Accept: application/json
+
+### Jazz Under Stars - sales summary
+GET {{baseUrl}}/api/v1/reports/events/{{jazzEventId}}/sales-summary
+Accept: application/json
+
+### Nordic Lights Live - availability
+GET {{baseUrl}}/api/v1/tickets/availability/{{nordicEventId}}
+Accept: application/json
+
+### Nordic Lights Live - event details
+GET {{baseUrl}}/api/v1/events/{{nordicEventId}}
+Accept: application/json
+
+### Nordic Lights Live - purchase tickets
+POST {{baseUrl}}/api/v1/tickets/purchases
+Content-Type: application/json
+Accept: application/json
+
+{
+  "eventId": "{{nordicEventId}}",
+  "pricingTierId": "{{nordicLightsPriceStandardId}}",
+  "customerName": "Bob",
+  "customerEmail": "bob@example.com",
+  "quantity": 5
+}
+
+### Nordic Lights Live - booking details by booking reference
+GET {{baseUrl}}/api/v1/tickets/purchases/reference/{{nordicBookingRef }}
+Accept: application/json
+
+### Nordic Lights Live - sales summary
+GET {{baseUrl}}/api/v1/reports/events/{{nordicEventId}}/sales-summary
+Accept: application/json
+
+### Symphonic Evenings - availability
+GET {{baseUrl}}/api/v1/tickets/availability/{{symphonicEventId}}
+Accept: application/json
+
+### Symphonic Evenings - event details
+GET {{baseUrl}}/api/v1/events/{{symphonicEventId}}
+Accept: application/json
+
+### Symphonic Evenings - purchase tickets
+POST {{baseUrl}}/api/v1/tickets/purchases
+Content-Type: application/json
+Accept: application/json
+
+{
+  "eventId": "{{symphonicEventId}}",
+  "pricingTierId": "{{symphonicPriceStandard }}",
+  "customerName": "Carol",
+  "customerEmail": "carol@example.com",
+  "quantity": 2
+}
+
+### Symphonic Evenings - booking details by booking reference
+GET {{baseUrl}}/api/v1/tickets/purchases/reference/{{symphonicBookingRef}}
+Accept: application/json
+
+### Symphonic Evenings - sales summary
+GET {{baseUrl}}/api/v1/reports/events/{{symphonicEventId}}/sales-summary
+Accept: application/json
+
