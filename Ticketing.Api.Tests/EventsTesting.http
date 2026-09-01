@@ -1,17 +1,17 @@
 @baseUrl = http://localhost:8080
 
-@jazzEventId = 73060548-fdc3-4b0b-b8f8-ff73fad81de2
-@nordicEventId = 8c746243-fd4f-424c-83f1-89453063ebc6
-@symphonicEventId = b7c0ec01-b6f2-4b63-b275-f376d51dc6da
+@jazzEventId = b2d31488-9f11-4b5d-9c89-767a5a68fe25
+@nordicEventId = 21a077e9-b16e-4221-8472-f7a65c183301
+@symphonicEventId = 85e91a0c-01f7-4e28-87d8-f24e38d43d8e
 
-@jazzVIPPriceTierId = cc5e8989-e35e-462e-a3fc-207df82abbb1
-@jazzBookingId = BK-20260831-8813BD0646
+@jazzVIPPriceTierId = 5b692685-b57b-445e-8958-913114d2474c
+@jazzBookingId = BK-20260901-985EDB9977
 
-@nordicLightsPriceStandardId = 1b8fe018-1c30-4015-9dec-2c3c21a63341
-@nordicBookingRef = BK-20260831-40A2A67A93
+@nordicLightsPriceStandardId = 9a8a80b3-b19d-4e35-ad71-3b7c433d993e
+@nordicBookingRef = BK-20260901-E80FAA6864
 
-@symphonicPriceStandard = 6f6da4dd-67fc-4b5b-9e92-2029ae6679c3
-@symphonicBookingRef = BK-20260831-07CA3C6089
+@symphonicPriceStandard = bf369890-84b3-4516-a816-07eda7617c00
+@symphonicBookingRef = BK-20260901-5A3CA600D9
 
 ### All Events
 GET {{baseUrl}}/api/v1/events?pageNumber=1&pageSize=20
@@ -104,3 +104,28 @@ Accept: application/json
 GET {{baseUrl}}/api/v1/reports/events/{{symphonicEventId}}/sales-summary
 Accept: application/json
 
+### Rock Chicago Live
+POST {{baseUrl}}//api/v1/events
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Rock Chicago Live",
+  "description": "Rock Chicago Live",
+  "venue": "Main Hall",
+  "eventDate": "2026-09-14",
+  "startTime": "19:30:00",
+  "totalTicketCapacity": 150,
+  "pricingTiers": [
+    {
+      "name": "Premium",
+      "price": 110.00,
+      "capacity": 60
+    },
+    {
+      "name": "Standard",
+      "price": 40,
+      "capacity": 100
+    }
+  ]
+}

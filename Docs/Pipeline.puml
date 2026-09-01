@@ -1,0 +1,133 @@
+@startuml
+title Ticketing.Api - ASP.NET Core HTTP Pipeline
+
+autonumber
+hide footbox
+
+actor Client
+participant "Kestrel / ASP.NET Core Host" as Host
+participant "ExceptionHandlingMiddleware" as ExceptionMw
+participant "Endpoint Routing + Model Binding" as Routing
+participant "FluentValidation AutoValidation" as Validation
+
+box "Controllers"
+participant "EventsController" as EventsController
+participant "TicketsController" as TicketsController
+participant "ReportsController" as ReportsController
+end box
+
+box "Services"
+participant "EventService" as EventService
+participant "TicketService" as TicketService
+participant "ReportService" as ReportService
+end box
+
+database "ApplicationDbContext\n(EF Core)" as DbContext
+database "PostgreSQL" as PostgreSql
+
+Client -> Host: HTTP request
+Host -> ExceptionMw: Invoke(HttpContext)
+ExceptionMw -> Routing: Match endpoint + bind DTO
+Routing -> Validation: Validate request model (if body exists)
+
+alt Validation fails
+	Validation --> ExceptionMw: ValidationException details
+	ExceptionMw --> Client: 400 Bad Request (ProblemDetails)
+else Validation passes
+	Routing -> Routing: Resolve controller action
+
+	alt POST /api/v1/events
+		Routing -> EventsController: CreateEvent(request)
+		EventsController -> EventService: CreateAsync(request)
+		EventService -> EventService: ValidateTotalTierCapacity(...)
+		EventService -> DbContext: Events.AddAsync(event)
+		DbContext -> PostgreSql: INSERT events, pricing_tiers
+		EventService -> DbContext: SaveChangesAsync()
+		DbContext -> PostgreSql: COMMIT
+		EventService --> EventsController: EventResponse
+		EventsController --> ExceptionMw: 201 Created
+
+	else PUT /api/v1/events/{eventId}
+		Routing -> EventsController: UpdateEvent(eventId, request)
+		EventsController -> EventService: UpdateAsync(eventId, request)
+		EventService -> DbContext: Events.Include(PricingTiers).FirstOrDefaultAsync
+		DbContext -> PostgreSql: SELECT event + pricing tiers
+		EventService -> EventService: Business checks + tier merge/remove
+		EventService -> DbContext: SaveChangesAsync()
+		DbContext -> PostgreSql: UPDATE events/pricing_tiers
+		EventService --> EventsController: EventResponse
+		EventsController --> ExceptionMw: 200 OK
+
+	else DELETE /api/v1/events/{eventId}
+		Routing -> EventsController: DeleteEvent(eventId)
+		EventsController -> EventService: DeleteAsync(eventId)
+		EventService -> DbContext: Events.Include(PricingTiers).FirstOrDefaultAsync
+		DbContext -> PostgreSql: SELECT event + pricing tiers
+		EventService -> EventService: Ensure no tickets sold
+		EventService -> DbContext: Events.Remove(event)
+		EventService -> DbContext: SaveChangesAsync()
+		DbContext -> PostgreSql: DELETE events (cascade pricing_tiers)
+		EventService --> EventsController: void
+		EventsController --> ExceptionMw: 204 No Content
+
+	else GET /api/v1/events or /api/v1/events/{eventId}
+		Routing -> EventsController: GetEvents(...) or GetEventById(...)
+		EventsController -> EventService: GetAllAsync(...) / GetByIdAsync(...)
+		EventService -> DbContext: AsNoTracking + Include(PricingTiers)
+		DbContext -> PostgreSql: SELECT events/pricing_tiers
+		EventService --> EventsController: EventResponse / PagedResponse
+		EventsController --> ExceptionMw: 200 OK
+
+	else POST /api/v1/tickets/purchases
+		Routing -> TicketsController: Purchase(request)
+		TicketsController -> TicketService: PurchaseAsync(request)
+		TicketService -> DbContext: Database.BeginTransactionAsync(RepeatableRead)
+		DbContext -> PostgreSql: BEGIN TRANSACTION
+		TicketService -> DbContext: ExecuteSqlInterpolatedAsync(... FOR UPDATE)
+		DbContext -> PostgreSql: SELECT 1 FROM events ... FOR UPDATE
+		TicketService -> DbContext: Events.Include(PricingTiers).FirstOrDefaultAsync
+		DbContext -> PostgreSql: SELECT locked event + pricing tiers
+		TicketService -> TicketService: Validate event time + capacities
+		TicketService -> DbContext: TicketPurchases.AddAsync(purchase)
+		DbContext -> PostgreSql: INSERT ticket_purchases
+		TicketService -> DbContext: SaveChangesAsync()
+		DbContext -> PostgreSql: UPDATE pricing_tiers.TicketsSold\nUPDATE events.UpdatedAtUtc
+		TicketService -> DbContext: CommitAsync()
+		DbContext -> PostgreSql: COMMIT
+		TicketService --> TicketsController: TicketPurchaseResponse
+		TicketsController --> ExceptionMw: 201 Created
+
+	else GET /api/v1/tickets/availability/{eventId}
+		Routing -> TicketsController: GetAvailability(eventId)
+		TicketsController -> TicketService: GetAvailabilityAsync(eventId)
+		TicketService -> DbContext: AsNoTracking + Include(PricingTiers)
+		DbContext -> PostgreSql: SELECT event + pricing tiers
+		TicketService --> TicketsController: TicketAvailabilityResponse
+		TicketsController --> ExceptionMw: 200 OK
+
+	else GET /api/v1/reports/events/{eventId}/sales-summary
+		Routing -> ReportsController: GetEventSalesSummary(eventId)
+		ReportsController -> ReportService: GetEventSummaryAsync(eventId)
+		ReportService -> DbContext: AsNoTracking + Include(PricingTiers)
+		DbContext -> PostgreSql: SELECT event + pricing tiers
+		ReportService --> ReportsController: EventSalesSummaryResponse
+		ReportsController --> ExceptionMw: 200 OK
+
+	else GET /api/v1/reports/events/sales-summary
+		Routing -> ReportsController: GetAllSalesSummaries()
+		ReportsController -> ReportService: GetAllEventSummariesAsync()
+		ReportService -> DbContext: AsNoTracking + Include(PricingTiers) + OrderBy
+		DbContext -> PostgreSql: SELECT events + pricing tiers
+		ReportService --> ReportsController: IReadOnlyCollection<EventSalesSummaryResponse>
+		ReportsController --> ExceptionMw: 200 OK
+	end
+
+	opt Service throws NotFoundException/ConflictException/BusinessRuleViolationException
+		ExceptionMw --> Client: 404/409/400 ProblemDetails
+	end
+
+	ExceptionMw --> Client: Success JSON response
+end
+
+@enduml
+

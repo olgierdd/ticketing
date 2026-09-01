@@ -1,0 +1,26 @@
+@startuml
+actor Client
+participant "ASP.NET Core Pipeline" as Pipeline
+participant "FluentValidation" as FV
+participant "UpdateEventRequestValidator" as Validator
+participant "EventsController" as Controller
+participant "IEventService" as Service
+participant "ExceptionHandlingMiddleware" as Middleware
+
+Client -> Pipeline: PUT /api/v1/events/{id}\nUpdateEventRequest JSON
+Pipeline -> FV: Auto-validation during model binding
+FV -> Validator: Validate(UpdateEventRequest)
+
+alt Validation fails
+  Validator --> FV: Validation errors
+  FV --> Pipeline: ValidationException
+  Pipeline -> Middleware: Exception propagated
+  Middleware --> Client: 400 Bad Request\nProblemDetails + errors
+else Validation succeeds
+  FV --> Pipeline: Valid model
+  Pipeline -> Controller: Invoke Update action
+  Controller -> Service: UpdateAsync(id, request)
+  Service --> Controller: Updated event
+  Controller --> Client: 200 OK + EventResponse
+end
+@enduml
