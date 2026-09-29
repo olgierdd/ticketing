@@ -94,15 +94,14 @@ public sealed class EventService(ApplicationDbContext dbContext, ILogger<EventSe
 
         foreach (var existingTier in eventEntity.PricingTiers.ToArray())
         {
-            if (!request.PricingTiers.Any(t => string.Equals(t.Name.Trim(), existingTier.Name, StringComparison.OrdinalIgnoreCase)))
+            if (request.PricingTiers.Any(t =>
+                    string.Equals(t.Name.Trim(), existingTier.Name, StringComparison.OrdinalIgnoreCase))) continue;
+            if (existingTier.TicketsSold > 0)
             {
-                if (existingTier.TicketsSold > 0)
-                {
-                    throw new ConflictException($"Pricing tier {existingTier.Name} cannot be removed because tickets were sold.");
-                }
-
-                dbContext.PricingTiers.Remove(existingTier);
+                throw new ConflictException($"Pricing tier {existingTier.Name} cannot be removed because tickets were sold.");
             }
+
+            dbContext.PricingTiers.Remove(existingTier);
         }
 
         foreach (var tierRequest in request.PricingTiers)

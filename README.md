@@ -1,5 +1,7 @@
 # Ticketing System
 
+![](Docs/Front-End.png)
+
 ## Prerequisites
 
 - .NET SDK 10.0+
@@ -8,10 +10,11 @@
 
 ## Solution Architecture
 
-The solution contains exactly two projects:
+The solution contains the following application projects:
 
 - `Ticketing.Api` - ASP.NET Core Web API with controllers, services, EF Core, validation, exception handling, Swagger
 - `Ticketing.Api.Tests` - NUnit test project with integration tests against PostgreSQL Testcontainers and unit tests with Moq
+- `Ticketing.Web` - React + Vite frontend with Material UI and a tree-style navigation for events, tickets, and reports
 
 Main API areas:
 
@@ -21,6 +24,7 @@ Main API areas:
 
 ## Database Configuration
 
+![](Docs/Schema.png)
 Default local connection string in `Ticketing.Api/appsettings.json`:
 
 `Host=localhost;Port=5433;Database=ticketing;Username=ticketing_user;Password=ticketing_password`
@@ -39,14 +43,19 @@ Start the full application stack from the repository root:
 docker compose up --build
 ```
 
-This starts both:
+This starts all services:
 
 - `postgres` - PostgreSQL database
 - `ticketing-api` - ASP.NET Core API
+- `ticketing-web` - React frontend served by Nginx
 
 API URL:
 
 - `http://localhost:8080`
+
+Frontend URL:
+
+- `http://localhost:3000`
 
 Swagger UI URL:
 
@@ -66,6 +75,22 @@ From your machine, connect to the PostgreSQL container using the published host 
 psql "host=localhost port=5433 dbname=ticketing user=ticketing_user password=ticketing_password"
 ```
 
+## How to run only Postgres database
+
+```bash
+docker run -d \
+  --name ticketing-postgres \
+  --restart unless-stopped \
+  -e POSTGRES_DB=ticketing \
+  -e POSTGRES_USER=ticketing_user \
+  -e POSTGRES_PASSWORD=ticketing_password \
+  -p 5433:5432 \
+  -v ticketing-postgres-data:/var/lib/postgresql/data \
+  postgres:16-alpine
+
+  docker stop ticketing-postgres
+```
+
 If you changed `POSTGRES_HOST_PORT`, use that value instead of `5433`.
 
 You can also connect from inside the container:
@@ -73,6 +98,22 @@ You can also connect from inside the container:
 ```bash
 docker compose exec postgres psql -U ticketing_user -d ticketing
 ```
+
+## How to build only front-end
+
+```bash
+docker compose up --build -d ticketing-web
+```
+
+### You can develop the front-end locally by running
+
+```bash
+npm run build
+npm run dev
+```
+
+the service will run on http://localhost:30001
+you can have two front ends on from docker second from development environment
 
 ## How to Stop the Application
 
@@ -112,6 +153,24 @@ dotnet dotnet-ef migrations add <MigrationName> --project Ticketing.Api/Ticketin
 dotnet test Ticketing.slnx
 ```
 
+Frontend production build validation:
+
+```bash
+cd Ticketing.Web
+npm install
+npm run build
+```
+
+Optional frontend local development server:
+
+```bash
+cd Ticketing.Web
+npm install
+npm run dev
+```
+
+The Vite dev server runs on `http://localhost:3000` and proxies `/api/*` calls to `http://localhost:8080`.
+
 ## Example API Requests
 
 Create event:
@@ -133,9 +192,12 @@ curl -X POST http://localhost:8080/api/v1/events \
     ]
   }'
 ```
+
 ### Utilize http scripting
+
 There is file `EventsTesting.http` at Tests project with http client call,
 Here is example:
+
 ```http request
 @baseUrl = http://localhost:8080
 
@@ -175,4 +237,3 @@ The purchase flow uses a transactional strategy with PostgreSQL row locking:
 5. Commit once both inventory and purchase are persisted.
 
 Because purchases for the same event lock the same event row, concurrent requests are serialized and cannot oversell inventory.
-

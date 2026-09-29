@@ -38,6 +38,20 @@ services:
     networks:
       - ticketing-network
 
+  ticketing-web:
+    build:
+      context: ./Ticketing.Web
+      dockerfile: Dockerfile
+    container_name: ticketing-web
+    ports:
+      - "3000:80"
+    depends_on:
+      ticketing-api:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - ticketing-network
+
 volumes:
   ticketing-postgres-data:
 

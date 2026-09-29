@@ -52,6 +52,36 @@ public sealed class ReportingTests : IntegrationTestFixtureBase
         Assert.That(summary.SalesByTier.First(x => x.PricingTierName == "VIP").TicketsSold, Is.EqualTo(2));
     }
 
+    [Test]
+    public async Task RevenueUsesHistoricalPurchasePrice_AfterTierPriceChanges()
+    {
+        var eventId = await SeedSalesAsync();
+        var eventResponse = await Client.GetFromJsonAsync<EventResponse>($"/api/v1/events/{eventId}");
+
+        var standardTier = eventResponse!.PricingTiers.First(t => t.Name == "Standard");
+        var vipTier = eventResponse.PricingTiers.First(t => t.Name == "VIP");
+        var updateRequest = new UpdateEventRequest(
+            eventResponse.Name,
+            eventResponse.Description,
+            eventResponse.Venue,
+            eventResponse.EventDate,
+            eventResponse.StartTime,
+            eventResponse.TotalTicketCapacity,
+            [
+                new PricingTierRequest("Standard", 75m, standardTier.Capacity),
+                new PricingTierRequest("VIP", 150m, vipTier.Capacity)
+            ]);
+
+        var updateResponse = await Client.PutAsJsonAsync($"/api/v1/events/{eventId}", updateRequest);
+        updateResponse.EnsureSuccessStatusCode();
+
+        var summary = await Client.GetFromJsonAsync<EventSalesSummaryResponse>($"/api/v1/reports/events/{eventId}/sales-summary");
+
+        Assert.That(summary!.TotalRevenue, Is.EqualTo(390m));
+        Assert.That(summary.SalesByTier.First(x => x.PricingTierName == "Standard").Revenue, Is.EqualTo(150m));
+        Assert.That(summary.SalesByTier.First(x => x.PricingTierName == "VIP").Revenue, Is.EqualTo(240m));
+    }
+
     private async Task<Guid> SeedSalesAsync()
     {
         var eventId = await CreateEventAsync(eventCapacity: 100, standardCapacity: 50, vipCapacity: 50);

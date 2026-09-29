@@ -9,25 +9,41 @@ actor "Developer" as Developer
 
 package "Repository Artifacts" {
   artifact "docker-compose.yml" as ComposeFile
-  artifact "Ticketing.Api/Dockerfile" as Dockerfile
-  artifact "Ticketing.Api.csproj" as Csproj
+  artifact "Ticketing.Api/Dockerfile" as ApiDockerfile
+  artifact "Ticketing.Api.csproj" as ApiCsproj
   artifact "Ticketing.Api Source Code" as ApiSource
+  artifact "Ticketing.Web/Dockerfile" as WebDockerfile
+  artifact "Ticketing.Web/package.json" as WebPackageJson
+  artifact "Ticketing.Web/src/App.jsx" as WebAppSource
+  artifact "Ticketing.Web/nginx.conf" as WebNginxConfig
 }
 
 package "Docker Build Process" {
   node "Docker Engine" as DockerEngine {
-	component "docker compose up\n(ticketing-api build)" as ComposeUp
+	component "docker compose up\n(ticketing-api build)" as ComposeApiUp
+	component "docker compose up\n(ticketing-web build)" as ComposeWebUp
 
-	package "Build Stage\n[mcr.microsoft.com/dotnet/sdk:10.0]" as BuildStage {
+	package "API Build Stage\n[mcr.microsoft.com/dotnet/sdk:10.0]" as ApiBuildStage {
 	  component "dotnet restore\nTicketing.Api.csproj" as RestoreStep
 	  component "copy source files" as CopyStep
 	  component "dotnet publish -c Release\n-o /app/publish\n/p:UseAppHost=false" as PublishStep
 	}
 
-	package "Runtime Stage\n[mcr.microsoft.com/dotnet/aspnet:10.0]" as RuntimeStage {
+	package "API Runtime Stage\n[mcr.microsoft.com/dotnet/aspnet:10.0]" as ApiRuntimeStage {
 	  artifact "ticketing-api image" as ApiImage
-	  component "ASPNETCORE_URLS=http://+:8080" as RuntimeConfig
-	  component "EXPOSE 8080\nENTRYPOINT dotnet Ticketing.Api.dll" as RuntimeEntry
+	  component "ASPNETCORE_URLS=http://+:8080" as ApiRuntimeConfig
+	  component "EXPOSE 8080\nENTRYPOINT dotnet Ticketing.Api.dll" as ApiRuntimeEntry
+	}
+
+	package "Frontend Build Stage\n[node:22-alpine]" as WebBuildStage {
+	  component "npm ci" as NpmCi
+	  component "npm run build" as NpmBuild
+	}
+
+	package "Frontend Runtime Stage\n[nginx:1.27-alpine]" as WebRuntimeStage {
+	  artifact "ticketing-web image" as WebImage
+	  component "nginx.conf\nserves SPA + proxies /api" as WebRuntimeConfig
+	  component "EXPOSE 80\nENTRYPOINT nginx" as WebRuntimeEntry
 	}
   }
 }
@@ -37,6 +53,11 @@ package "docker-compose Runtime Topology" {
 	node "ticketing-api service" as ApiService {
 	  component "Web API container\nport 8080 -> 8080" as WebApi
 	  component "Environment:\n- ASPNETCORE_ENVIRONMENT=Development\n- ConnectionStrings__DefaultConnection\n- Database__MigrateOnStartup=true\n- Database__SeedOnStartup=true" as ApiEnv
+	}
+
+	node "ticketing-web service" as WebService {
+	  component "Frontend container\nport 3000 -> 80" as FrontendContainer
+	  component "Nginx serves React app\nproxies /api/* to ticketing-api:8080" as FrontendRuntime
 	}
 
 	database "postgres service\npostgres:16-alpine\nport 5433 -> 5432" as Postgres {
@@ -49,24 +70,39 @@ package "docker-compose Runtime Topology" {
 }
 
 Developer --> ComposeFile : runs docker compose
-ComposeFile --> ComposeUp : defines services, network, volume
-ComposeFile --> Dockerfile : build.context=.\nbuild.dockerfile=Ticketing.Api/Dockerfile
+ComposeFile --> ComposeApiUp : defines API service, network, volume
+ComposeFile --> ComposeWebUp : defines frontend service
+ComposeFile --> ApiDockerfile : build.context=.\nbuild.dockerfile=Ticketing.Api/Dockerfile
+ComposeFile --> WebDockerfile : build.context=./Ticketing.Web
 
-Dockerfile --> RestoreStep : COPY csproj
-Csproj --> RestoreStep
-Dockerfile --> CopyStep : COPY Ticketing.Api/
+ApiDockerfile --> RestoreStep : COPY csproj
+ApiCsproj --> RestoreStep
+ApiDockerfile --> CopyStep : COPY Ticketing.Api/
 ApiSource --> CopyStep
 RestoreStep --> CopyStep
 CopyStep --> PublishStep
 PublishStep --> ApiImage : published output
-RuntimeConfig --> ApiImage
-RuntimeEntry --> ApiImage
+ApiRuntimeConfig --> ApiImage
+ApiRuntimeEntry --> ApiImage
+
+WebDockerfile --> NpmCi : COPY package.json + lockfile
+WebPackageJson --> NpmCi
+WebAppSource --> NpmBuild
+WebNginxConfig --> WebRuntimeConfig
+NpmCi --> NpmBuild
+NpmBuild --> WebImage : dist output
+WebRuntimeConfig --> WebImage
+WebRuntimeEntry --> WebImage
 
 ApiImage --> WebApi : container image for service
 ApiEnv --> WebApi
 
+WebImage --> FrontendContainer : container image for service
+FrontendRuntime --> FrontendContainer
+
 WebApi --> Postgres : Npgsql connection over ticketing-network
 ApiService ..> Postgres : depends_on\nservice_healthy
+WebService ..> ApiService : reverse proxy /api\nservice_started
 PgEnv --> Postgres
 PgHealth --> Postgres
 PostgresVolume --> Postgres : /var/lib/postgresql/data

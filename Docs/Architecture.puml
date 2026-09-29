@@ -3,9 +3,10 @@ skinparam componentStyle rectangle
 skinparam packageStyle rectangle
 left to right direction
 
-title Ticketing.Api - Component Diagram
+title Ticketing System - Component Diagram
 
 actor "API Client" as Client
+actor "Browser User" as BrowserUser
 
 package "Ticketing.Api" {
   package "HTTP Pipeline" {
@@ -49,7 +50,21 @@ package "Ticketing.Api" {
   }
 }
 
+package "Ticketing.Web" {
+  package "React UI" {
+    component "App.jsx\n(Tree navigation, forms, lists)" as WebApp
+    component "Material UI" as Mui
+    component "Nginx\n(Static hosting + API proxy)" as WebServer
+  }
+}
+
 database "PostgreSQL" as PostgreSql
+
+BrowserUser --> WebApp : HTTPS browser session
+WebApp --> WebServer : static assets + /api proxy
+WebServer --> EventsController : HTTP JSON
+WebServer --> TicketsController : HTTP JSON
+WebServer --> ReportsController : HTTP JSON
 
 Client --> EventsController : HTTP JSON
 Client --> TicketsController : HTTP JSON
@@ -68,6 +83,9 @@ Middleware ..> Validators : handles validation failures
 EventsController --> IEventService
 TicketsController --> ITicketService
 ReportsController --> IReportService
+
+WebApp ..> Mui : renders UI
+WebApp ..> WebServer : fetch /api/v1/*
 
 IEventService <|.. EventService
 ITicketService <|.. TicketService

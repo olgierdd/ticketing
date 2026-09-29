@@ -1,17 +1,17 @@
 @baseUrl = http://localhost:8080
 
-@jazzEventId = b2d31488-9f11-4b5d-9c89-767a5a68fe25
-@nordicEventId = 21a077e9-b16e-4221-8472-f7a65c183301
-@symphonicEventId = 85e91a0c-01f7-4e28-87d8-f24e38d43d8e
+@jazzEventId = 5b5e242b-7ffb-4537-b544-2e1601692a38
+@nordicEventId = 8b3c467f-0281-4df1-93ea-6ff422e016ab
+@symphonicEventId = 740758a8-168e-4938-bc86-ee45359597af
 
-@jazzVIPPriceTierId = 5b692685-b57b-445e-8958-913114d2474c
-@jazzBookingId = BK-20260901-985EDB9977
+@jazzVIPPriceTierId = 7a06e345-3a11-42b7-a90d-dc82c3220c70
+@jazzBookingId = BK-20260901-0333C12316
 
-@nordicLightsPriceStandardId = 9a8a80b3-b19d-4e35-ad71-3b7c433d993e
-@nordicBookingRef = BK-20260901-E80FAA6864
+@nordicLightsPriceStandardId = 4062bd6e-fa7f-47e8-89ee-bc479ab1bb03
+@nordicBookingRef = BK-20260901-C48AA387CA
 
-@symphonicPriceStandard = bf369890-84b3-4516-a816-07eda7617c00
-@symphonicBookingRef = BK-20260901-5A3CA600D9
+@symphonicPriceStandard = c4b62cf9-898c-4bb5-9271-81702a54da40
+@symphonicBookingRef = BK-20260901-0BC17E8134
 
 ### All Events
 GET {{baseUrl}}/api/v1/events?pageNumber=1&pageSize=20

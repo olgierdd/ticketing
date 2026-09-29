@@ -13,6 +13,7 @@ public sealed class ReportService(ApplicationDbContext dbContext) : IReportServi
         var eventEntity = await dbContext.Events
             .AsNoTracking()
             .Include(e => e.PricingTiers)
+            .Include(e => e.Purchases)
             .FirstOrDefaultAsync(e => e.Id == eventId, cancellationToken)
             ?? throw new NotFoundException($"Event {eventId} was not found.");
 
@@ -24,6 +25,7 @@ public sealed class ReportService(ApplicationDbContext dbContext) : IReportServi
         var events = await dbContext.Events
             .AsNoTracking()
             .Include(e => e.PricingTiers)
+            .Include(e => e.Purchases)
             .OrderBy(e => e.Name)
             .ToArrayAsync(cancellationToken);
 
@@ -32,16 +34,31 @@ public sealed class ReportService(ApplicationDbContext dbContext) : IReportServi
 
     private static EventSalesSummaryResponse ToSummary(Domain.Entities.Event eventEntity)
     {
-        var totalSold = eventEntity.PricingTiers.Sum(t => t.TicketsSold);
-        var totalRevenue = eventEntity.PricingTiers.Sum(t => t.TicketsSold * t.Price);
+        var salesByTier = eventEntity.Purchases
+            .Where(p => p.Status == Domain.Entities.PurchaseStatus.Confirmed)
+            .GroupBy(p => p.PricingTierId)
+            .ToDictionary(
+                group => group.Key,
+                group => (
+                    TicketsSold: group.Sum(p => p.Quantity),
+                    Revenue: group.Sum(p => p.UnitPrice * p.Quantity)));
+
         var byTier = eventEntity.PricingTiers
             .OrderBy(t => t.Name)
-            .Select(t => new EventSalesByTierResponse(
-                t.Id,
-                t.Name,
-                t.TicketsSold,
-                t.TicketsSold * t.Price))
+            .Select(t =>
+            {
+                salesByTier.TryGetValue(t.Id, out var tierSales);
+
+                return new EventSalesByTierResponse(
+                    t.Id,
+                    t.Name,
+                    tierSales.TicketsSold,
+                    tierSales.Revenue);
+            })
             .ToArray();
+
+        var totalSold = byTier.Sum(t => t.TicketsSold);
+        var totalRevenue = byTier.Sum(t => t.Revenue);
 
         return new EventSalesSummaryResponse(
             eventEntity.Id,
