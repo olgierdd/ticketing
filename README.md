@@ -1,6 +1,6 @@
 # Ticketing System
 
-![](Docs/Front-End.png)
+![](Docs/Front-end-app.png)
 
 ## Prerequisites
 
