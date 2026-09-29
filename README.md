@@ -29,7 +29,7 @@ Default local connection string in `Ticketing.Api/appsettings.json`:
 
 `Host=localhost;Port=5433;Database=ticketing;Username=ticketing_user;Password=ticketing_password`
 
-For Docker Compose, the API uses `ConnectionStrings__DefaultConnection` and connects to the `postgres` service inside the compose network.
+For Docker Compose, the API uses `ConnectionStrings__DefaultConnection` and connects to the `postgres` service with the docker compose network.
 
 The PostgreSQL container is published to your machine on port `5433` by default to avoid conflicts with a local database already using `5432`.
 
@@ -75,7 +75,7 @@ From your machine, connect to the PostgreSQL container using the published host 
 psql "host=localhost port=5433 dbname=ticketing user=ticketing_user password=ticketing_password"
 ```
 
-## How to run only Postgres database
+## How to run only a Postgres database
 
 ```bash
 docker run -d \
@@ -193,10 +193,10 @@ curl -X POST http://localhost:8080/api/v1/events \
   }'
 ```
 
-### Utilize http scripting
+### utilize http scripting
 
-There is file `EventsTesting.http` at Tests project with http client call,
-Here is example:
+There is file `EventsTesting.http` at the Tests project with http client call,
+Here is an example:
 
 ```http request
 @baseUrl = http://localhost:8080
